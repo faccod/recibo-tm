@@ -40,7 +40,7 @@
   </script>
 
   <style>
-    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
     input, select, textarea { font-size: 16px !important; }
     .no-spin::-webkit-outer-spin-button, .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .no-spin { -moz-appearance: textfield; }
@@ -50,11 +50,13 @@
       background: white;
       border-radius: 16px;
       box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
-      overflow: hidden;
+      overflow: clip;
     }
     .recibo {
       font-family: 'Inter', sans-serif;
       color: #0a0a0a;
+      word-break: break-word;
+      max-width: 100%;
     }
     .recibo h1 { font-weight: 800; letter-spacing: -0.02em; }
     .recibo-divider { border-top: 1px dashed #d1d5db; }
@@ -656,18 +658,18 @@
 
     const container = document.getElementById('recibo-container');
     container.innerHTML = `
-      <div class="recibo p-6 sm:p-8">
+      <div class="recibo p-4 sm:p-6 md:p-8">
         <!-- Cabeçalho -->
         <div class="text-center pb-4 border-b-2 border-gray-900">
-          <h1 class="text-2xl sm:text-3xl text-gray-900">${EMPRESA.nome}</h1>
-          <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">${EMPRESA.subtitulo} • ${reciboNum(state.reciboCounter - 1)}</p>
+          <h1 class="text-xl sm:text-2xl md:text-3xl text-gray-900">${EMPRESA.nome}</h1>
+          <p class="text-[10px] sm:text-xs text-gray-500 mt-1 uppercase tracking-widest">${EMPRESA.subtitulo} • ${reciboNum(state.reciboCounter - 1)}</p>
         </div>
 
         <!-- Dados da empresa -->
-        <div class="py-4 text-center text-xs text-gray-600 space-y-0.5 border-b border-gray-200">
-          <div>${EMPRESA.endereco} • ${EMPRESA.cidade}</div>
-          <div>${EMPRESA.cep} • CNPJ ${EMPRESA.cnpj}</div>
-          <div>Tel: ${EMPRESA.telefone}</div>
+        <div class="py-4 text-center text-[10px] sm:text-xs text-gray-600 space-y-0.5 border-b border-gray-200">
+          <div>${EMPRESA.endereco}</div>
+          <div>${EMPRESA.cidade} • ${EMPRESA.cep}</div>
+          <div>CNPJ ${EMPRESA.cnpj} • Tel: ${EMPRESA.telefone}</div>
         </div>
 
         <!-- Cliente + Data -->
@@ -684,22 +686,32 @@
 
         <!-- Tabela de produtos -->
         <div class="py-4">
-          <div class="grid grid-cols-12 gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider pb-2 border-b border-gray-300">
-            <div class="col-span-6">Item</div>
-            <div class="col-span-2 text-center">Qtd</div>
-            <div class="col-span-2 text-right">Unit.</div>
-            <div class="col-span-2 text-right">Total</div>
-          </div>
-          <div class="recibo-zebra">
-            ${state.produtos.map(p => `
-              <div class="grid grid-cols-12 gap-2 py-2.5 text-sm border-b border-gray-100">
-                <div class="col-span-6 text-gray-900 font-medium">${escapeHtml(p.desc)}</div>
-                <div class="col-span-2 text-center text-gray-700 font-mono">${p.qtd}</div>
-                <div class="col-span-2 text-right text-gray-700 font-mono">${formatBRL(p.valor)}</div>
-                <div class="col-span-2 text-right text-gray-900 font-bold font-mono">${formatBRL(p.qtd * p.valor)}</div>
-              </div>
-            `).join('')}
-          </div>
+          <table class="w-full text-sm" style="table-layout:fixed">
+            <colgroup>
+              <col style="width:42%">
+              <col style="width:10%">
+              <col style="width:22%">
+              <col style="width:26%">
+            </colgroup>
+            <thead>
+              <tr class="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-300">
+                <th class="text-left py-2 font-bold">Item</th>
+                <th class="text-center py-2 font-bold">Qtd</th>
+                <th class="text-right py-2 font-bold">Unit.</th>
+                <th class="text-right py-2 font-bold">Total</th>
+              </tr>
+            </thead>
+            <tbody class="recibo-zebra">
+              ${state.produtos.map(p => `
+                <tr class="border-b border-gray-100">
+                  <td class="py-2.5 text-gray-900 font-medium truncate" style="max-width:0" title="${escapeHtml(p.desc)}">${escapeHtml(p.desc)}</td>
+                  <td class="py-2.5 text-center text-gray-700 tabular-nums">${p.qtd}</td>
+                  <td class="py-2.5 text-right text-gray-700 tabular-nums whitespace-nowrap">${formatBRL(p.valor)}</td>
+                  <td class="py-2.5 text-right text-gray-900 font-bold tabular-nums whitespace-nowrap">${formatBRL(p.qtd * p.valor)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
 
         <!-- Total -->
