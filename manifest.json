@@ -1,0 +1,19 @@
+{
+  "name": "Recibo - Tabacaria da Montanha",
+  "short_name": "Recibo",
+  "description": "Gerador de recibos de venda com QR Code Pix",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f4f6",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

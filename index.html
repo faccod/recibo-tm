@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Recibo - Tabacaria da Montanha</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    input, select, textarea { font-size: 16px !important; }
+    .no-spin::-webkit-outer-spin-button, .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .no-spin { -moz-appearance: textfield; }
+
+    /* Recibo profissional */
+    .recibo-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+    .recibo {
+      font-family: 'Inter', sans-serif;
+      color: #0a0a0a;
+    }
+    .recibo h1 { font-weight: 800; letter-spacing: -0.02em; }
+    .recibo-divider { border-top: 1px dashed #d1d5db; }
+    .recibo-zebra tr:nth-child(even) { background: #fafafa; }
+    .recibo-pix {
+      background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+      color: white;
+    }
+    .recibo-total {
+      background: #0a0a0a;
+      color: white;
+    }
+
+    /* Print */
+    @media print {
+      body { background: white !important; padding: 0 !important; }
+      body * { visibility: hidden; }
+      .recibo-print, .recibo-print * { visibility: visible; }
+      .recibo-print {
+        position: absolute;
+        left: 0; top: 0; right: 0;
+        width: 100%;
+        padding: 12mm;
+      }
+      .no-print { display: none !important; }
+      .recibo-card { box-shadow: none !important; border-radius: 0 !important; }
+    }
+
+    /* Animações suaves */
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- ==================== TELA 1: FORMULÁRIO ==================== -->
+  <div id="tela-form" class="max-w-2xl mx-auto pb-32">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div class="px-4 py-4 flex items-center justify-between">
+        <div>
+          <div class="text-xs text-gray-500 uppercase tracking-wider">Tabacaria da Montanha</div>
+          <h1 class="text-xl font-bold text-gray-900">Recibo de Venda</h1>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-gray-500">Recibo</div>
+          <div class="text-sm font-mono font-semibold text-gray-900" id="header-counter">#0000</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 space-y-4">
+      <!-- Cliente -->
+      <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <label class="block">
+          <span class="text-sm font-semibold text-gray-700">Cliente</span>
+          <input id="input-cliente" type="text" inputmode="text" autocomplete="off"
+            placeholder="Ex: Espetinho do Joacir"
+            class="mt-2 w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-brand-600 focus:bg-white transition"
+            oninput="onFormChange()">
+        </label>
+      </section>
+
+      <!-- Produtos -->
+      <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-semibold text-gray-700">Produtos <span id="prod-count" class="text-gray-400 font-normal">(0)</span></span>
+          <button onclick="abrirModalProduto()" class="text-sm font-semibold text-brand-700 hover:text-brand-900 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Adicionar
+          </button>
+        </div>
+        <div id="lista-produtos" class="space-y-2">
+          <!-- produtos renderizados aqui -->
+        </div>
+        <div id="lista-vazia" class="text-center py-8 text-gray-400 text-sm">
+          Nenhum produto. Toque em <strong class="text-brand-700">Adicionar</strong>.
+        </div>
+      </section>
+
+      <!-- Favoritos -->
+      <section id="section-favoritos" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-semibold text-gray-700 flex items-center gap-1">
+            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Favoritos
+          </span>
+          <button onclick="abrirGerenciadorFavoritos()" class="text-xs text-gray-500 hover:text-gray-700">
+            Gerenciar
+          </button>
+        </div>
+        <div id="chips-favoritos" class="flex flex-wrap gap-2">
+          <!-- chips renderizados aqui -->
+        </div>
+      </section>
+
+      <!-- Total preview -->
+      <section id="total-preview" class="hidden bg-gray-900 text-white rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-300">Total</span>
+          <span class="text-2xl font-bold font-mono" id="total-valor">R$ 0,00</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Botão Gerar (fixo embaixo) -->
+    <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent no-print">
+      <div class="max-w-2xl mx-auto">
+        <button id="btn-gerar" onclick="gerarRecibo()" disabled
+          class="w-full bg-gray-900 text-white font-bold py-4 rounded-2xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-800 transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Gerar Recibo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TELA 2: PREVIEW DO RECIBO ==================== -->
+  <div id="tela-preview" class="hidden max-w-2xl mx-auto pb-32">
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-10 no-print">
+      <div class="px-4 py-3 flex items-center gap-3">
+        <button onclick="voltarForm()" class="p-2 -ml-2 text-gray-700 hover:text-gray-900">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+        </button>
+        <div>
+          <div class="text-xs text-gray-500">Recibo</div>
+          <div class="text-base font-bold text-gray-900 font-mono" id="preview-numero">#0000</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4">
+      <div id="recibo-container" class="recibo-card">
+        <!-- Recibo renderizado aqui -->
+      </div>
+
+      <div class="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500 no-print">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+        Documento sem valor fiscal
+      </div>
+    </main>
+
+    <!-- Ações fixas embaixo -->
+    <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent no-print">
+      <div class="max-w-2xl mx-auto grid grid-cols-2 gap-2">
+        <button onclick="compartilharWhatsApp()" class="bg-green-600 text-white font-bold py-3.5 rounded-xl shadow hover:bg-green-700 transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>
+        <button onclick="salvarImagem()" class="bg-gray-900 text-white font-bold py-3.5 rounded-xl shadow hover:bg-gray-800 transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+          Salvar
+        </button>
+        <button onclick="imprimirRecibo()" class="bg-white border border-gray-200 text-gray-900 font-bold py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m0 0a48.159 48.159 0 0110.5 0m-10.5 0V4.875c0-.621.504-1.125 1.125-1.125h8.25c.621 0 1.125.504 1.125 1.125v3.659"/></svg>
+          Imprimir
+        </button>
+        <button onclick="novoRecibo()" class="bg-white border border-gray-200 text-gray-900 font-bold py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          Novo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADICIONAR/EDITAR PRODUTO ==================== -->
+  <dialog id="modal-produto" class="rounded-2xl p-0 w-full max-w-md backdrop:bg-black/40">
+    <form method="dialog" onsubmit="salvarProdutoModal(event)" class="bg-white">
+      <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <h2 id="modal-produto-titulo" class="text-lg font-bold text-gray-900">Adicionar produto</h2>
+        <button type="button" onclick="fecharModalProduto()" class="p-1 text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <label class="block">
+          <span class="text-sm font-semibold text-gray-700">Descrição</span>
+          <input id="modal-desc" type="text" required autocomplete="off" list="lista-favoritos-datalist"
+            placeholder="Ex: Red Baron Premium"
+            class="mt-1.5 w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-brand-600 focus:bg-white transition">
+          <datalist id="lista-favoritos-datalist"></datalist>
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-sm font-semibold text-gray-700">Quantidade</span>
+            <input id="modal-qtd" type="number" min="1" step="1" value="1" required
+              class="mt-1.5 w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-brand-600 focus:bg-white transition no-spin">
+          </label>
+          <label class="block">
+            <span class="text-sm font-semibold text-gray-700">Valor unit. (R$)</span>
+            <input id="modal-valor" type="text" inputmode="decimal" required placeholder="0,00"
+              class="mt-1.5 w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-brand-600 focus:bg-white transition font-mono">
+          </label>
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input id="modal-favorito" type="checkbox" class="w-5 h-5 rounded text-amber-500 focus:ring-amber-500">
+          <span class="text-sm text-gray-700">Salvar nos favoritos</span>
+        </label>
+      </div>
+      <div class="p-5 border-t border-gray-100 flex gap-2">
+        <button type="button" onclick="fecharModalProduto()" class="flex-1 py-3 rounded-xl font-semibold text-gray-700 hover:bg-gray-100 transition">Cancelar</button>
+        <button type="submit" class="flex-1 py-3 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition">Adicionar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ==================== MODAL: GERENCIAR FAVORITOS ==================== -->
+  <dialog id="modal-favoritos" class="rounded-2xl p-0 w-full max-w-md backdrop:bg-black/40">
+    <div class="bg-white">
+      <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-lg font-bold text-gray-900">Favoritos</h2>
+        <button onclick="document.getElementById('modal-favoritos').close()" class="p-1 text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="lista-favoritos-modal" class="p-2 max-h-96 overflow-y-auto">
+        <!-- lista de favoritos -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ==================== TOAST ==================== -->
+  <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-xl z-50 hidden fade-in"></div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+  // ============== CONSTANTES DA EMPRESA ==============
+  const EMPRESA = {
+    nome: 'TABACARIA DA MONTANHA',
+    subtitulo: 'Recibo de Venda',
+    endereco: 'AV FREDERICO GRULKE 1367 - CENTRO',
+    cidade: 'SANTA MARIA DE JETIBÁ/ES',
+    cep: 'CEP 29645-000',
+    cnpj: '97.519.383/0001-40',
+    telefone: '(27) 9929-1314',
+    pixChave: '97519383000140',  // CNPJ sem pontuação (chave Pix)
+    pixTipo: 'CNPJ',
+    merchantName: 'TABACARIA DA MONTANHA',
+    merchantCity: 'SANTA MARIA',
+  };
+
+  // ============== STATE ==============
+  const state = {
+    cliente: '',
+    produtos: [],   // { id, desc, qtd, valor }
+    reciboCounter: 1,
+    editandoId: null,
+  };
+
+  // ============== STORAGE ==============
+  const STORAGE = {
+    FORM: 'recibo-form-v1',
+    COUNTER: 'recibo-counter-v1',
+    FAVORITOS: 'recibo-favoritos-v1',
+  };
+
+  function loadState() {
+    try {
+      const f = localStorage.getItem(STORAGE.FORM);
+      if (f) {
+        const parsed = JSON.parse(f);
+        state.cliente = parsed.cliente || '';
+        state.produtos = parsed.produtos || [];
+        state.reciboCounter = parseInt(localStorage.getItem(STORAGE.COUNTER) || '1', 10);
+      } else {
+        state.reciboCounter = parseInt(localStorage.getItem(STORAGE.COUNTER) || '1', 10);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar state:', e);
+    }
+  }
+
+  function saveFormState() {
+    try {
+      localStorage.setItem(STORAGE.FORM, JSON.stringify({
+        cliente: state.cliente,
+        produtos: state.produtos,
+      }));
+      localStorage.setItem(STORAGE.COUNTER, String(state.reciboCounter));
+    } catch (e) {}
+  }
+
+  function getFavoritos() {
+    try { return JSON.parse(localStorage.getItem(STORAGE.FAVORITOS) || '[]'); }
+    catch (e) { return []; }
+  }
+
+  function saveFavoritos(favs) {
+    localStorage.setItem(STORAGE.FAVORITOS, JSON.stringify(favs));
+  }
+
+  // ============== FORMATTERS ==============
+  const fmtBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  function formatBRL(n) { return fmtBRL.format(n || 0); }
+
+  function parseMoeda(str) {
+    if (!str) return 0;
+    str = String(str).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(str);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function formatarMoedaInput(el) {
+    let n = parseMoeda(el.value);
+    if (isNaN(n)) n = 0;
+    el.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function agora() {
+    const d = new Date();
+    return {
+      data: d.toLocaleDateString('pt-BR'),
+      hora: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      dataHora: d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    };
+  }
+
+  function reciboNum(n) { return '#' + String(n).padStart(4, '0'); }
+
+  // ============== BR CODE PIX (EMV) ==============
+  function tlv(id, value) {
+    return id + String(value.length).padStart(2, '0') + value;
+  }
+
+  function crc16ccitt(str) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) {
+        if (crc & 0x8000) crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+        else crc = (crc << 1) & 0xFFFF;
+      }
+    }
+    return crc;
+  }
+
+  function sanitize(s, max) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, max).trim();
+  }
+
+  function gerarBRCode({ chave, valor, nome, cidade, txid = '***' }) {
+    const gui = tlv('00', 'br.gov.bcb.pix');
+    const key = tlv('01', chave);
+    const merchantAccountInfo = tlv('26', gui + key);
+    let payload = '000201' + merchantAccountInfo;
+    payload += tlv('52', '0000');
+    payload += tlv('53', '986');
+    if (valor > 0) payload += tlv('54', valor.toFixed(2));
+    payload += tlv('58', 'BR');
+    payload += tlv('59', sanitize(nome, 25));
+    payload += tlv('60', sanitize(cidade, 15));
+    payload += tlv('62', tlv('05', txid));
+    payload += '6304';
+    const crc = crc16ccitt(payload);
+    return payload + crc.toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  // ============== PRODUTOS ==============
+  function adicionarProduto(prod) {
+    state.produtos.push({
+      id: Date.now() + Math.random(),
+      desc: prod.desc,
+      qtd: prod.qtd,
+      valor: prod.valor,
+    });
+  }
+
+  function removerProduto(id) {
+    state.produtos = state.produtos.filter(p => p.id !== id);
+    saveFormState();
+    renderProdutos();
+    onFormChange();
+  }
+
+  function calcularTotal() {
+    return state.produtos.reduce((s, p) => s + (p.qtd * p.valor), 0);
+  }
+
+  function renderProdutos() {
+    const lista = document.getElementById('lista-produtos');
+    const vazia = document.getElementById('lista-vazia');
+    const count = document.getElementById('prod-count');
+    count.textContent = `(${state.produtos.length})`;
+
+    if (state.produtos.length === 0) {
+      lista.innerHTML = '';
+      vazia.classList.remove('hidden');
+      return;
+    }
+    vazia.classList.add('hidden');
+
+    lista.innerHTML = state.produtos.map((p, i) => `
+      <div class="bg-gray-50 rounded-xl p-3 flex items-center gap-3 fade-in">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-gray-900 truncate">${escapeHtml(p.desc)}</div>
+          <div class="text-xs text-gray-500 mt-0.5">${p.qtd} × ${formatBRL(p.valor)}</div>
+        </div>
+        <div class="text-right">
+          <div class="font-bold text-gray-900 font-mono">${formatBRL(p.qtd * p.valor)}</div>
+        </div>
+        <button onclick="removerProduto(${p.id})" class="text-gray-400 hover:text-red-500 p-2 -mr-2" aria-label="Remover">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ============== FAVORITOS ==============
+  function toggleFavorito(prod) {
+    const favs = getFavoritos();
+    const idx = favs.findIndex(f => f.desc.toLowerCase() === prod.desc.toLowerCase());
+    if (idx >= 0) {
+      favs.splice(idx, 1);
+      saveFavoritos(favs);
+      return false;
+    } else {
+      favs.push({ desc: prod.desc, valor: prod.valor });
+      saveFavoritos(favs);
+      return true;
+    }
+  }
+
+  function renderFavoritos() {
+    const favs = getFavoritos();
+    const section = document.getElementById('section-favoritos');
+    const chips = document.getElementById('chips-favoritos');
+    if (favs.length === 0) {
+      section.classList.add('hidden');
+      return;
+    }
+    section.classList.remove('hidden');
+    chips.innerHTML = favs.map((f, i) => `
+      <button onclick="usarFavorito(${i})" class="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-full text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1.5">
+        <span class="truncate max-w-[150px]">${escapeHtml(f.desc)}</span>
+        <span class="text-amber-700 font-mono text-xs">${formatBRL(f.valor)}</span>
+      </button>
+    `).join('');
+
+    // atualizar datalist
+    const datalist = document.getElementById('lista-favoritos-datalist');
+    datalist.innerHTML = favs.map(f => `<option value="${escapeHtml(f.desc)}">`).join('');
+  }
+
+  function usarFavorito(idx) {
+    const fav = getFavoritos()[idx];
+    if (!fav) return;
+    adicionarProduto({ desc: fav.desc, qtd: 1, valor: fav.valor });
+    saveFormState();
+    renderProdutos();
+    onFormChange();
+    toast(`✓ ${fav.desc} adicionado`);
+  }
+
+  function abrirGerenciadorFavoritos() {
+    const favs = getFavoritos();
+    const lista = document.getElementById('lista-favoritos-modal');
+    if (favs.length === 0) {
+      lista.innerHTML = '<div class="p-8 text-center text-gray-400 text-sm">Nenhum favorito ainda.<br>Adicione um produto e marque "Salvar nos favoritos".</div>';
+    } else {
+      lista.innerHTML = favs.map((f, i) => `
+        <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-gray-900 truncate">${escapeHtml(f.desc)}</div>
+            <div class="text-sm text-gray-500 font-mono">${formatBRL(f.valor)}</div>
+          </div>
+          <button onclick="removerFavorito(${i})" class="text-gray-400 hover:text-red-500 p-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+    document.getElementById('modal-favoritos').showModal();
+  }
+
+  function removerFavorito(idx) {
+    const favs = getFavoritos();
+    favs.splice(idx, 1);
+    saveFavoritos(favs);
+    renderFavoritos();
+    abrirGerenciadorFavoritos();
+  }
+
+  // ============== MODAL PRODUTO ==============
+  function abrirModalProduto(editId) {
+    const modal = document.getElementById('modal-produto');
+    const titulo = document.getElementById('modal-produto-titulo');
+    const desc = document.getElementById('modal-desc');
+    const qtd = document.getElementById('modal-qtd');
+    const valor = document.getElementById('modal-valor');
+    const fav = document.getElementById('modal-favorito');
+
+    if (editId) {
+      const p = state.produtos.find(x => x.id === editId);
+      if (!p) return;
+      state.editandoId = editId;
+      titulo.textContent = 'Editar produto';
+      desc.value = p.desc;
+      qtd.value = p.qtd;
+      valor.value = p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const favs = getFavoritos();
+      fav.checked = favs.some(f => f.desc.toLowerCase() === p.desc.toLowerCase());
+    } else {
+      state.editandoId = null;
+      titulo.textContent = 'Adicionar produto';
+      desc.value = '';
+      qtd.value = '1';
+      valor.value = '';
+      fav.checked = false;
+    }
+    modal.showModal();
+    setTimeout(() => desc.focus(), 50);
+  }
+
+  function fecharModalProduto() {
+    document.getElementById('modal-produto').close();
+  }
+
+  function salvarProdutoModal(ev) {
+    ev.preventDefault();
+    const desc = document.getElementById('modal-desc').value.trim();
+    const qtd = parseInt(document.getElementById('modal-qtd').value, 10) || 1;
+    const valor = parseMoeda(document.getElementById('modal-valor').value);
+    const fav = document.getElementById('modal-favorito').checked;
+
+    if (!desc) { toast('⚠️ Descrição obrigatória'); return; }
+    if (valor <= 0) { toast('⚠️ Valor precisa ser maior que zero'); return; }
+
+    if (state.editandoId) {
+      // editar
+      const p = state.produtos.find(x => x.id === state.editandoId);
+      if (p) {
+        const oldDesc = p.desc;
+        p.desc = desc;
+        p.qtd = qtd;
+        p.valor = valor;
+        // Se mudou o nome, refazer favorito
+        if (fav) toggleFavorito({ desc, valor });
+        if (oldDesc !== desc) {
+          const favs = getFavoritos().filter(f => f.desc.toLowerCase() !== oldDesc.toLowerCase());
+          saveFavoritos(favs);
+        }
+      }
+    } else {
+      // novo
+      adicionarProduto({ desc, qtd, valor });
+      if (fav) toggleFavorito({ desc, valor });
+    }
+
+    saveFormState();
+    renderProdutos();
+    renderFavoritos();
+    onFormChange();
+    fecharModalProduto();
+    toast(state.editandoId ? '✓ Produto atualizado' : '✓ Produto adicionado');
+  }
+
+  // ============== RENDER ==============
+  function onFormChange() {
+    state.cliente = document.getElementById('input-cliente').value;
+    saveFormState();
+    const total = calcularTotal();
+    const totalEl = document.getElementById('total-valor');
+    const totalBox = document.getElementById('total-preview');
+    if (total > 0) {
+      totalBox.classList.remove('hidden');
+      totalEl.textContent = formatBRL(total);
+    } else {
+      totalBox.classList.add('hidden');
+    }
+    const btn = document.getElementById('btn-gerar');
+    btn.disabled = !state.cliente.trim() || state.produtos.length === 0;
+  }
+
+  // ============== GERAR RECIBO ==============
+  function gerarRecibo() {
+    if (!state.cliente.trim() || state.produtos.length === 0) {
+      toast('⚠️ Preencha cliente e produtos');
+      return;
+    }
+    state.reciboCounter++;
+    saveFormState();
+    document.getElementById('header-counter').textContent = reciboNum(state.reciboCounter - 1);
+
+    const t = agora();
+    const total = calcularTotal();
+    const brCode = gerarBRCode({
+      chave: EMPRESA.pixChave,
+      valor: total,
+      nome: EMPRESA.merchantName,
+      cidade: EMPRESA.merchantCity,
+      txid: 'REC' + String(state.reciboCounter).padStart(4, '0'),
+    });
+
+    const container = document.getElementById('recibo-container');
+    container.innerHTML = `
+      <div class="recibo p-6 sm:p-8">
+        <!-- Cabeçalho -->
+        <div class="text-center pb-4 border-b-2 border-gray-900">
+          <h1 class="text-2xl sm:text-3xl text-gray-900">${EMPRESA.nome}</h1>
+          <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">${EMPRESA.subtitulo} • ${reciboNum(state.reciboCounter - 1)}</p>
+        </div>
+
+        <!-- Dados da empresa -->
+        <div class="py-4 text-center text-xs text-gray-600 space-y-0.5 border-b border-gray-200">
+          <div>${EMPRESA.endereco} • ${EMPRESA.cidade}</div>
+          <div>${EMPRESA.cep} • CNPJ ${EMPRESA.cnpj}</div>
+          <div>Tel: ${EMPRESA.telefone}</div>
+        </div>
+
+        <!-- Cliente + Data -->
+        <div class="py-4 border-b border-gray-200 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wider">Cliente</div>
+            <div class="font-semibold text-gray-900 mt-0.5">${escapeHtml(state.cliente)}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-500 uppercase tracking-wider">Data</div>
+            <div class="font-semibold text-gray-900 mt-0.5">${t.dataHora}</div>
+          </div>
+        </div>
+
+        <!-- Tabela de produtos -->
+        <div class="py-4">
+          <div class="grid grid-cols-12 gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider pb-2 border-b border-gray-300">
+            <div class="col-span-6">Item</div>
+            <div class="col-span-2 text-center">Qtd</div>
+            <div class="col-span-2 text-right">Unit.</div>
+            <div class="col-span-2 text-right">Total</div>
+          </div>
+          <div class="recibo-zebra">
+            ${state.produtos.map(p => `
+              <div class="grid grid-cols-12 gap-2 py-2.5 text-sm border-b border-gray-100">
+                <div class="col-span-6 text-gray-900 font-medium">${escapeHtml(p.desc)}</div>
+                <div class="col-span-2 text-center text-gray-700 font-mono">${p.qtd}</div>
+                <div class="col-span-2 text-right text-gray-700 font-mono">${formatBRL(p.valor)}</div>
+                <div class="col-span-2 text-right text-gray-900 font-bold font-mono">${formatBRL(p.qtd * p.valor)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="recibo-total rounded-xl p-4 my-4 flex items-center justify-between">
+          <span class="text-sm font-semibold uppercase tracking-widest text-gray-300">Total a pagar</span>
+          <span class="text-2xl sm:text-3xl font-bold font-mono">${formatBRL(total)}</span>
+        </div>
+
+        <!-- Box Pix -->
+        <div class="recibo-pix rounded-xl p-5 my-4">
+          <div class="flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg>
+            <span class="font-bold text-sm uppercase tracking-widest">Pague com Pix</span>
+          </div>
+          <div class="bg-white rounded-lg p-4 flex flex-col sm:flex-row items-center gap-4">
+            <div id="qrcode-canvas" class="bg-white p-2 rounded-lg flex-shrink-0"></div>
+            <div class="flex-1 text-center sm:text-left min-w-0">
+              <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Chave Pix (${EMPRESA.pixTipo})</div>
+              <div class="font-mono font-bold text-gray-900 text-base sm:text-lg break-all">${EMPRESA.cnpj}</div>
+              <div class="text-xs text-gray-500 mt-0.5">${EMPRESA.pixChave}</div>
+              <button onclick="copiarChavePix()" class="mt-3 text-xs font-bold text-brand-700 hover:text-brand-900 underline">Copiar chave</button>
+              <button onclick="copiarBRCode()" class="mt-3 ml-3 text-xs font-bold text-brand-700 hover:text-brand-900 underline">Copiar copia-e-cola</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="pt-4 border-t border-gray-200 text-center text-xs text-gray-500 space-y-0.5">
+          <div class="font-semibold text-gray-700">— Documento sem valor fiscal —</div>
+          <div>Recibo ${reciboNum(state.reciboCounter - 1)} emitido em ${t.dataHora}</div>
+          <div>${EMPRESA.nome} • ${EMPRESA.cidade}</div>
+        </div>
+      </div>
+    `;
+
+    // Salvar BR Code globalmente pra função de copiar
+    window._brCode = brCode;
+
+    // Mostrar tela de preview (PRIMEIRO, antes do QR que pode demorar)
+    document.getElementById('tela-form').classList.add('hidden');
+    document.getElementById('tela-preview').classList.remove('hidden');
+    document.getElementById('preview-numero').textContent = reciboNum(state.reciboCounter - 1);
+    window.scrollTo(0, 0);
+
+    // Gerar QR Code (não-bloqueante, com fallback)
+    try {
+      if (typeof QRCode !== 'undefined') {
+        QRCode.toCanvas(document.getElementById('qrcode-canvas'), brCode, {
+          width: 140,
+          margin: 1,
+          color: { dark: '#0a0a0a', light: '#ffffff' },
+        }, err => { if (err) console.error('QR err:', err); });
+      } else {
+        const el = document.getElementById('qrcode-canvas');
+        el.innerHTML = '<div class="text-xs text-gray-500 text-center p-2">QR Code<br>carregando...</div>';
+      }
+    } catch (e) {
+      console.error('QRCode falhou:', e);
+    }
+  }
+
+  // ============== AÇÕES DO RECIBO ==============
+  function voltarForm() {
+    document.getElementById('tela-preview').classList.add('hidden');
+    document.getElementById('tela-form').classList.remove('hidden');
+  }
+
+  function novoRecibo() {
+    if (!confirm('Limpar o formulário e começar um novo recibo?')) return;
+    state.cliente = '';
+    state.produtos = [];
+    document.getElementById('input-cliente').value = '';
+    saveFormState();
+    renderProdutos();
+    onFormChange();
+    voltarForm();
+  }
+
+  async function copiarChavePix() {
+    if (await copyText(EMPRESA.pixChave)) {
+      toast('✓ Chave Pix copiada');
+    } else {
+      toast('⚠️ Não consegui copiar');
+    }
+  }
+
+  async function copiarBRCode() {
+    if (await copyText(window._brCode || '')) {
+      toast('✓ Copia-e-cola copiado');
+    } else {
+      toast('⚠️ Não consegui copiar');
+    }
+  }
+
+  // Copia texto com fallback pra contextos não-seguros (file://, http://)
+  async function copyText(text) {
+    if (!text) return false;
+    // 1) Clipboard API moderna (precisa HTTPS ou localhost)
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) { /* cai no fallback */ }
+    }
+    // 2) Fallback com execCommand (funciona em file:// também)
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function salvarImagem() {
+    const el = document.getElementById('recibo-container');
+    try {
+      toast('Gerando imagem...');
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const num = String(state.reciboCounter - 1).padStart(4, '0');
+      const clienteLimpo = state.cliente.replace(/[^\w]/g, '_').slice(0, 30);
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      downloadBlob(blob, `recibo_${num}_${clienteLimpo}.png`);
+      toast('✓ Imagem salva');
+    } catch (e) {
+      console.error(e);
+      toast('⚠️ Erro ao gerar imagem');
+    }
+  }
+
+  async function compartilharWhatsApp() {
+    const el = document.getElementById('recibo-container');
+    const num = String(state.reciboCounter - 1).padStart(4, '0');
+    const clienteLimpo = state.cliente.replace(/[^\w]/g, '_').slice(0, 30);
+    // Texto CURTO: só o recibo + chave Pix pra copiar
+    const textoCurto = `*Recibo ${reciboNum(state.reciboCounter - 1)}* - ${EMPRESA.nome}\n` +
+      `🔑 Chave Pix (${EMPRESA.pixTipo}): *${EMPRESA.pixChave}*`;
+
+    try {
+      toast('Gerando imagem...');
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      const file = new File([blob], `recibo_${num}_${clienteLimpo}.png`, { type: 'image/png' });
+
+      // 1) Mobile moderno: Web Share API com imagem + texto curto
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text: textoCurto, title: `Recibo ${num}` });
+        return;
+      }
+
+      // 2) Fallback (PC / browser antigo): baixa a imagem + abre WhatsApp com texto curto
+      downloadBlob(blob, `recibo_${num}_${clienteLimpo}.png`);
+      setTimeout(() => {
+        const url = `https://wa.me/?text=${encodeURIComponent(textoCurto)}`;
+        window.open(url, '_blank');
+        toast('📎 Imagem em Downloads. Arraste pro chat do WhatsApp.');
+      }, 300);
+    } catch (e) {
+      console.warn('compartilharWhatsApp:', e);
+      // Se até o html2canvas falhar, pelo menos abre o WhatsApp
+      const url = `https://wa.me/?text=${encodeURIComponent(textoCurto)}`;
+      window.open(url, '_blank');
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 200);
+  }
+
+  function imprimirRecibo() {
+    // Mover recibo pra um container print, e voltar depois
+    const original = document.getElementById('recibo-container').innerHTML;
+    const printDiv = document.createElement('div');
+    printDiv.className = 'recibo-print';
+    printDiv.innerHTML = original;
+    document.body.appendChild(printDiv);
+    window.print();
+    setTimeout(() => printDiv.remove(), 100);
+  }
+
+  // ============== TOAST ==============
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 2500);
+  }
+
+  // ============== INIT ==============
+  document.addEventListener('DOMContentLoaded', () => {
+    loadState();
+
+    // Modo demo via URL (?demo=1) - preenche com exemplo
+    if (new URLSearchParams(location.search).get('demo') === '1') {
+      state.cliente = 'Espetinho do Joacir';
+      state.produtos = [
+        { id: 1, desc: 'Red Baron Premium', qtd: 2, valor: 140 },
+        { id: 2, desc: 'Red Baron Ice', qtd: 1, valor: 160 },
+        { id: 3, desc: 'Malboro Vermelho', qtd: 3, valor: 12 },
+      ];
+      document.getElementById('input-cliente').value = state.cliente;
+    } else {
+      document.getElementById('input-cliente').value = state.cliente;
+    }
+
+    document.getElementById('header-counter').textContent = reciboNum(state.reciboCounter);
+    renderProdutos();
+    renderFavoritos();
+    onFormChange();
+
+    // Se vier ?preview=1 já abre o recibo direto (sem setTimeout pro headless pegar)
+    if (new URLSearchParams(location.search).get('preview') === '1') {
+      gerarRecibo();
+    }
+
+    // formatação automática do campo valor
+    document.getElementById('modal-valor').addEventListener('blur', function() {
+      if (this.value) formatarMoedaInput(this);
+    });
+    document.getElementById('modal-valor').addEventListener('input', function() {
+      // só números, vírgula, ponto
+      this.value = this.value.replace(/[^\d.,]/g, '');
+    });
+
+    // dialog: fechar ao clicar fora
+    document.getElementById('modal-produto').addEventListener('click', e => {
+      if (e.target.id === 'modal-produto') fecharModalProduto();
+    });
+
+    // registrar service worker (PWA offline)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW falhou:', err));
+    }
+  });
+  </script>
+</body>
+</html>
